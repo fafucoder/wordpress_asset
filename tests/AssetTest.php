@@ -4,8 +4,9 @@ namespace FaFu\Asset\Tests;
 use FaFu\Asset\Asset;
 use FaFu\Asset\Style;
 use FaFu\Asset\Script;
+use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
 
-class AssetTest extends \WP_UnitTestCase {
+class AssetTest extends WP_UnitTestCase {
     public function setUp() {
         parent::setUp();
 

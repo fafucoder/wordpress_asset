@@ -3,8 +3,9 @@ namespace FaFu\Asset\Tests;
 
 use FaFu\Asset\Asset;
 use FaFu\Asset\Style;
+use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
 
-class ScriptTest extends \WP_UnitTestCase {
+class ScriptTest extends WP_UnitTestCase {
     public $old_wp_scripts;
 
     public function setUp() {

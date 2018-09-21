@@ -4,8 +4,9 @@ namespace FaFu\Asset\Tests;
 use FaFu\Asset\Script;
 use FaFu\Asset\Style;
 use FaFu\Asset\Package;
+use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
 
-class PackageTest extends \WP_UnitTestCase {
+class PackageTest extends WP_UnitTestCase {
     public $old_wp_scripts;
     public $old_wp_styles;
 
