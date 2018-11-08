@@ -1,10 +1,6 @@
 <?php
 namespace FaFu\Asset;
 
-use FaFu\Asset\Configurable;
-use FaFu\Asset\Script;
-use FaFu\Asset\Style;
-
 class Package extends Configurable {
     /**
      * The package name.
@@ -49,10 +45,16 @@ class Package extends Configurable {
      * @return mixed         
      */
     public static function add($name, $config = array()) {
-        $package = new Package($name, $config);
-        $package->register();
+        if (is_array($name)) {
+            foreach ($name as $n => $conf) {
+                static::add($n, $conf);
+            }
+        } else {
+            $package = new Package($name, $config);
+            $package->register();
 
-        return $package;
+            return $package;
+        }
     }
 
     /**
@@ -63,10 +65,16 @@ class Package extends Configurable {
      * @return object         return this instance
      */
     public static function queue($name, $config = array()) {
-        $package = new Package($name, $config);
-        $package->enqueue();
+        if (is_array($name)) {
+            foreach ($name as $n => $conf) {
+                static::queue($n, $conf);
+            }
+        } else {
+            $package = new Package($name, $config);
+            $package->enqueue();
 
-        return $package;
+            return $package;
+        }
     }
 
     /**
@@ -112,7 +120,7 @@ class Package extends Configurable {
     public function __construct($name, $config = array()) {
         $this->name = $name;
         $config = $this->config($config);
-
+        
         parent::__construct($config);
     }
 
@@ -124,10 +132,14 @@ class Package extends Configurable {
     public function register() {
         if (!isset(static::$registered[$this->name])) {
             foreach ($this->styles as $name => $style) {
+                $name = $this->getAssetName($name);
+
                 Style::add($name, $style);
             }
 
             foreach ($this->scripts as $name => $script) {
+                $name = $this->getAssetName($name);
+
                 Script::add($name, $script);
             }
 
@@ -145,10 +157,14 @@ class Package extends Configurable {
     public function enqueue() {
         if (!isset(static::$enqueued[$this->name])) {
             foreach ($this->styles as $name => $style) {
+                $name = $this->getAssetName($name);
+
                 Style::queue($name, $style);
             }
 
             foreach ($this->scripts as $name => $script) {
+                $name = $this->getAssetName($name);
+
                 Script::queue($name, $script);
             }
 
@@ -222,12 +238,27 @@ class Package extends Configurable {
             if (is_array($value)) {
                 foreach ($value as $key => $v) {
                     if (!is_array($v)) {
-                        continue;
+                        $v = array(
+                            'path' => $v,
+                        );
                     }
-                    $value[$key] = array_merge($v, $diff);
+                    $value[$key] = array_merge($diff, $v);
                 }
             }
             return $value;
         }, $config);
+    }
+
+    /**
+     * Get asset name.
+     * 
+     * @param  string|integer $name 
+     * @return string       
+     */
+    protected function getAssetName($name) {
+        if (is_numeric($name)) {
+            return $this->name;
+        }
+        return $name;
     }
 }
