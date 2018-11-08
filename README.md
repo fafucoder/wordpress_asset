@@ -26,7 +26,7 @@ Script::add('foo', array(
   ));
 ```
 
-If you have many asset to register, you can use `Package` Class.
+If you have many asset to register, you can use `Package` Class, `add` function is register asset and `enqueue` function is enqueue asset
 
 ```php
 Package::add('foo', array(
@@ -52,6 +52,35 @@ Package::add('foo', array(
 	'base' => '/public',
 ));
 
+```
+
+If you have many asset to pre register but register only when necessary. use `Package` may result memory waste, use `PackageManger` is good idea.
+```php
+$packageManager->register(array(
+	'jquery' => array(
+		'scripts' => array('jquery.js'),
+		'styles' => array('jquery.css'),
+	),
+	'react' => array(
+		'scripts' => array('react.js'),
+		'styles' => array('react.css'),
+	),
+	'bootstrap' => array(
+		'scripts' => array('bootstrap.js'),
+		'styles' => array('bootstrap.css'),
+	),
+), array(
+	'base' => '/public/asset/',
+	'area' => 'public',
+	'version' => '1.5.0',
+));
+
+//use PackgeManager->add will register asset
+$packageManger->add('react');
+
+
+//use pakcageManger->queue will enqueue asset
+$packgeManger->queue('react');
 ```
 
 ## Asset Location
@@ -87,6 +116,8 @@ you can register asset to front or admin and others, Below is the area where you
 | $script->localize()                          | localize script                            | return $this           |
 | $script->defer()                             | defer script                               | return $this           |
 | $script->async()                             | async script                               | return $this           |
+
+more information you looking for source code
 
 ## License
 MIT License
