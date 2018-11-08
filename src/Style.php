@@ -64,7 +64,8 @@ class Style extends Asset {
      */
     public function register() {
         if (!$this->is('registered')) {
-            wp_register_style($this->name, $this->getPath(), $this->deps, $this->ver, $this->media);
+            $dependency = $this->checkDepency($this->dependency);
+            wp_register_style($this->name, $this->getPath(), $dependency, $this->version, $this->media);
         }
 
         return $this;
@@ -76,14 +77,23 @@ class Style extends Asset {
      * @return object  return $this
      */
     public function deregister() {
-        if ($this->is('enqueued')) {
-            wp_dequeue_style($this->name);
-            unset(static::$enqueued[$this->name]);
-        }
-
         if ($this->is('registered')) {
             wp_deregister_style($this->name);
             unset(static::$registered[$this->name]);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Dequeue style.
+     * 
+     * @return object return $this
+     */
+    public function dequeue() {
+        if ($this->is('enqueued')) {
+            wp_dequeue_style($this->name);
+            unset(static::$enqueued[$this->name]);
         }
 
         return $this;
@@ -151,16 +161,21 @@ class Style extends Asset {
 
     /**
      * Check asset status.
-     * 
+     *
+     * @param  string asset name
      * @param  string  $status asset status
      * 
      * @return boolean         
      */
-    public function is($status = 'enqueued') {
-        if (empty($this->name)) {
+    public function is($status = 'enqueued', $name = '') {
+        if (empty($name)) {
+            $name = $this->name;
+        }
+
+        if (empty($name)) {
             return false;
         }
 
-        return wp_style_is($this->name, $status);
+        return wp_script_is($this->name, $status);
     }
 }

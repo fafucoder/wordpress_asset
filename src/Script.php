@@ -102,7 +102,8 @@ class Script extends Asset {
      */
     public function register() {
         if (!$this->is('registered')) {
-            wp_register_script($this->name, $this->getPath(), $this->deps, $this->ver, $this->footer);
+            $dependency = $this->checkDepency($this->dependency);
+            wp_register_script($this->name, $this->getPath(), $dependency, $this->version, $this->footer);
         }
 
         return $this;
@@ -118,7 +119,8 @@ class Script extends Asset {
             if ($this->is('registered')) {
                 wp_enqueue_script($this->name);
             } else {
-                wp_enqueue_script($this->name, $this->getPath(), $this->deps, $this->ver, $this->footer);
+                $dependency = $this->checkDepency($this->dependency);
+                wp_enqueue_script($this->name, $this->getPath(), $dependency, $this->version, $this->footer);
             }
         }
 
@@ -128,7 +130,6 @@ class Script extends Asset {
 
         return $this;
     }
-
 
     /**
      * Load tag.
@@ -157,14 +158,23 @@ class Script extends Asset {
      * @return object  return $this
      */
     public function deregister() {
-        if ($this->is('enqueued')) {
-            wp_dequeue_script($this->name);
-            unset(static::$enqueued[$this->name]);
-        }
-
         if ($this->is('registered')) {
             wp_deregister_script($this->name);
             unset(static::$registered[$this->name]);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Dequeue script.
+     * 
+     * @return object return $this
+     */
+    public function dequeue() {
+        if ($this->is('enqueued')) {
+            wp_dequeue_script($this->name);
+            unset(static::$enqueued[$this->name]);
         }
 
         return $this;
@@ -200,13 +210,18 @@ class Script extends Asset {
 
     /**
      * Check asset status.
-     * 
+     *
+     * @param  string asset name
      * @param  string  $status asset status
      * 
      * @return boolean         
      */
-    public function is($status = 'enqueued') {
-        if (empty($this->name)) {
+    public function is($status = 'enqueued', $name = '') {
+        if (empty($name)) {
+            $name = $this->name;
+        }
+
+        if (empty($name)) {
             return false;
         }
 

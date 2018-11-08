@@ -337,4 +337,20 @@ class Asset extends Configurable {
 
         return rtrim($this->getBase(), '/') . DIRECTORY_SEPARATOR . $this->path;
     }
+
+    /**
+     * resolve style dependency not found.
+     * 
+     * @param  array  $dependecy 
+     * @return array            
+     */
+    protected function checkDepency($dependecy = array()) {
+        foreach ($dependecy as $key => $dep) {
+            if (!$this->is('registered', $dep)) {
+                unset($dependecy[$key]);
+            }
+        }
+
+        return $dependecy;
+    }
 }
