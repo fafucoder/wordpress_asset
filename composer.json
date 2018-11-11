@@ -1,12 +1,12 @@
 {
     "name": "dawn/wordpress_asset",
     "description": "wordpress register or enqueue assets",
-    "type": "package",
+    "type": "library",
     "license": "MIT",
     "keywords": [
-    	"wordpress",
-    	"assets",
-    	"wordpress-asset"
+        "wordpress",
+        "assets",
+        "wordpress-asset"
     ],
     "require": {
         "phpunit/phpunit": "^6.5"
@@ -15,9 +15,9 @@
         "inpsyde/monkery-test-case": "^5.0"
     },
     "autoload": {
-    	"psr-4": {
-    		"FaFu\\Asset\\": "./src",
-    		"FaFu\\Asset\\Tests\\": "./tests"
-    	}
+        "psr-4": {
+            "Dawn\\WordpressAsset\\": "./src",
+            "Dawn\\WordpressAsset\\Tests\\": "./tests"
+        }
     }
 }

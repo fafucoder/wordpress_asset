@@ -1,9 +1,9 @@
 <?php
-namespace FaFu\Asset\Tests;
+namespace Dawn\WordpressAsset\Tests;
 
-use FaFu\Asset\Script;
-use FaFu\Asset\Style;
-use FaFu\Asset\Package;
+use Dawn\WordpressAsset\Script;
+use Dawn\WordpressAsset\Style;
+use Dawn\WordpressAsset\Package;
 use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
 
 class PackageTest extends WP_UnitTestCase {

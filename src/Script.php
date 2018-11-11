@@ -1,5 +1,5 @@
 <?php
-namespace FaFu\Asset;
+namespace Dawn\WordpressAsset;
 
 class Script extends Asset {
     /**

@@ -1,8 +1,8 @@
 <?php
-namespace FaFu\Asset\Tests;
+namespace Dawn\WordpressAsset\Tests;
 
-use FaFu\Asset\Asset;
-use FaFu\Asset\Style;
+use Dawn\WordpressAsset\Asset;
+use Dawn\WordpressAsset\Style;
 use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
 
 class ScriptTest extends WP_UnitTestCase {

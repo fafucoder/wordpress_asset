@@ -1,8 +1,8 @@
 <?php
-namespace FaFu\Asset\Tests;
+namespace Dawn\WordpressAsset\Tests;
 
-use FaFu\Asset\PackageManager;
-use FaFu\Asset\Package;
+use Dawn\WordpressAsset\PackageManager;
+use Dawn\WordpressAsset\Package;
 use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
 
 class PackageManagerTest extends WP_UnitTestCase {
