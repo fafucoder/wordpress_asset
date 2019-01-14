@@ -4,37 +4,37 @@ namespace Dawn\WordpressAsset;
 class Style extends Asset {
     /**
      * The media.
-     * 
+     *
      * @var string
      */
     public $media = 'screen';
 
     /**
      * The style attributes.
-     * 
+     *
      * @var string
      */
     public $attribute = array();
 
     /**
      * The list of registered assets.
-     * 
+     *
      * @var array
      */
     public static $registered = array();
 
     /**
      * The list of enqueued assets.
-     * 
+     *
      * @var array
      */
     public static $enqueued = array();
 
     /**
      * The media.
-     * 
-     * @param  string $media
-     * 
+     *
+     * @param string $media
+     *
      * @return object return $this
      */
     public function media($media = 'all') {
@@ -44,9 +44,11 @@ class Style extends Asset {
     }
 
     /**
-     * The style attributes
-     * @param  string $attribute attributes.
-     * @return object   return $this
+     * The style attributes.
+     *
+     * @param string $attribute attributes.
+     *
+     * @return object return $this
      */
     public function attribute($attribute = array()) {
         if (is_callable($attribute)) {
@@ -59,12 +61,13 @@ class Style extends Asset {
 
     /**
      * Register style.
-     * 
+     *
      * @return object return $this
      */
     public function register() {
         if (!$this->is('registered')) {
-            $dependency = $this->checkDepency($this->dependency);
+            // $dependency = $this->checkDepency($this->dependency);
+            $dependency = $this->registerDependency();
             wp_register_style($this->name, $this->getPath(), $dependency, $this->version, $this->media);
         }
 
@@ -73,8 +76,8 @@ class Style extends Asset {
 
     /**
      * Unregister asset.
-     * 
-     * @return object  return $this
+     *
+     * @return object return $this
      */
     public function deregister() {
         if ($this->is('registered')) {
@@ -87,7 +90,7 @@ class Style extends Asset {
 
     /**
      * Dequeue style.
-     * 
+     *
      * @return object return $this
      */
     public function dequeue() {
@@ -101,7 +104,7 @@ class Style extends Asset {
 
     /**
      * Enqueue style.
-     * 
+     *
      * @return object return $this.
      */
     public function enqueue() {
@@ -109,7 +112,9 @@ class Style extends Asset {
             if ($this->is('registered')) {
                 wp_enqueue_style($this->name);
             } else {
-                wp_enqueue_style($this->name, $this->getPath(), $this->deps, $this->ver, $this->media);
+                // $dependency = $this->checkDepency($this->dependency);
+                $dependency = $this->enqueueDependency();
+                wp_enqueue_style($this->name, $this->getPath(), $dependency, $this->version, $this->media);
             }
         }
         $this->inlineAsset();
@@ -120,12 +125,13 @@ class Style extends Asset {
 
     /**
      * Load tag.
-     * 
-     * @param  string $html   style html
-     * @param  string $handle handle name
-     * @param  string $href   style href
-     * @param  string $media 
-     * @return string         
+     *
+     * @param string $html   style html
+     * @param string $handle handle name
+     * @param string $href   style href
+     * @param string $media
+     *
+     * @return string
      */
     public function _loadTag($html, $handle, $href, $media) {
         if ($this->name === $handle) {
@@ -136,7 +142,7 @@ class Style extends Asset {
                     $html = preg_replace($pattens, $value, $html);
                 } else {
                     $replace = "$key=$value />";
-                    $html = str_replace("/>", $replace, $html);
+                    $html = str_replace('/>', $replace, $html);
                 }
             }
 
@@ -148,7 +154,7 @@ class Style extends Asset {
 
     /**
      * Inline style.
-     * 
+     *
      * @return object return $this
      */
     public function inlineAsset() {
@@ -163,9 +169,10 @@ class Style extends Asset {
      * Check asset status.
      *
      * @param  string asset name
-     * @param  string  $status asset status
-     * 
-     * @return boolean         
+     * @param string $status asset status
+     * @param mixed  $name
+     *
+     * @return bool
      */
     public function is($status = 'enqueued', $name = '') {
         if (empty($name)) {
@@ -176,6 +183,6 @@ class Style extends Asset {
             return false;
         }
 
-        return wp_script_is($this->name, $status);
+        return wp_style_is($name, $status);
     }
 }

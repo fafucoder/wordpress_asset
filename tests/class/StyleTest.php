@@ -5,7 +5,7 @@ use Dawn\WordpressAsset\Asset;
 use Dawn\WordpressAsset\Style;
 use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
 
-class StyleTest extends WP_UnitTestCase {
+class StyleTest extends \WP_UnitTestCase {
     public $old_wp_styles;
 
     public function setUp() {
@@ -13,20 +13,23 @@ class StyleTest extends WP_UnitTestCase {
 
         $this->old_wp_styles = isset($GLOBALS['wp_styles']) ? $GLOBALS['wp_styles'] : null;
         remove_action('wp_default_styles', '_wp_default_styles');
-        remove_action( 'wp_print_styles', 'print_emoji_styles' );
+        remove_action('wp_print_styles', 'print_emoji_styles');
         $GLOBALS['wp_styles'] = new \WP_Styles();
         $GLOBALS['wp_styles']->default_version = get_bloginfo('version');
         $GLOBALS['wp_styles']->base_url = 'http://example.org';
     }
 
-    function tearDown() {
+    public function tearDown() {
         Style::$registered = array();
         Style::$enqueued = array();
 
         $GLOBALS['wp_styles'] = $this->old_wp_styles;
-        add_action( 'wp_default_styles', 'wp_default_styles' );
-        add_action( 'wp_print_styles', 'print_emoji_styles' );
+        add_action('wp_default_styles', 'wp_default_styles');
+        add_action('wp_print_styles', 'print_emoji_styles');
 
+        if ( current_theme_supports( 'wp-block-styles' ) ) {
+            remove_theme_support( 'wp-block-styles' );
+        }
         parent::tearDown();
     }
 
@@ -34,8 +37,8 @@ class StyleTest extends WP_UnitTestCase {
         $style = new Style('foo', array());
 
         $this->assertSame('foo', $style->name);
-        $this->assertSame('1.0.0', $style->ver);
-        $this->assertSame(array(), $style->deps);
+        $this->assertSame('1.0.0', $style->version);
+        $this->assertSame(array(), $style->dependency);
         $this->assertSame('front', $style->area);
         $this->assertSame('after', $style->position);
         $this->assertSame('screen', $style->media);
@@ -63,7 +66,7 @@ class StyleTest extends WP_UnitTestCase {
 
         $this->assertEquals(array('sizes' => '16x16', 'rel' => 'icon'), $style->attribute);
 
-        $style->attribute(function() {
+        $style->attribute(function () {
             return array('target' => '_blank');
         });
         $this->assertEquals(array('target' => '_blank'), $style->attribute);
@@ -71,7 +74,7 @@ class StyleTest extends WP_UnitTestCase {
 
     public function testRegister() {
         $style = new Style('foo', array(
-            'path' => '/fixtures/foo.css'
+            'path' => '/fixtures/foo.css',
         ));
 
         $this->assertFalse(wp_style_is('foo', 'registered'));
@@ -107,7 +110,7 @@ class StyleTest extends WP_UnitTestCase {
         ));
 
         $style->attribute(array(
-            'sizes' => "16x16",
+            'sizes' => '16x16',
             'rel' => 'icon',
             'media' => 'print',
         ));
@@ -122,7 +125,7 @@ class StyleTest extends WP_UnitTestCase {
             'path' => '/fixtures/foo.css',
         ));
 
-        $inline = "a {color: blue; }";
+        $inline = 'a {color: blue; }';
         $style->inline($inline);
         $style->enqueue();
 
@@ -161,7 +164,7 @@ class StyleTest extends WP_UnitTestCase {
 
     public function testDoEnqueue() {
         $style = new Style('foo', array(
-            'path' => '/fixture/foo.css'
+            'path' => '/fixture/foo.css',
         ));
 
         $this->assertFalse($style->is('enqueued'));
@@ -224,6 +227,38 @@ class StyleTest extends WP_UnitTestCase {
         $this->assertEquals($expected, get_echo('wp_print_styles'));
     }
 
+    public function testGetAsDependency() {
+        Style::add('foo', array(
+            'path' => '/fixtures/foo.css',
+        ));
+
+        Style::add('bar', array(
+            'path' => '/fixters/bar.css',
+            'dependency' => array('foo'),
+        ));
+
+        $asset = Style::get('bar');
+        $this->assertInstanceOf(Asset::class, $asset);
+
+        $asset
+            ->media('orientation: portrait')
+            ->inline('div: {border: 10px solid;}')
+            ->path('/fixtures/bar/bar.css')
+            ->area('login')
+            ->doEnqueue();
+
+        do_action('login_enqueue_scripts');
+
+        $expected = "<link rel='stylesheet' id='foo-css'  href='http://example.org/fixtures/foo.css?ver=1.0.0' type='text/css' media='screen' />\n";
+        $expected .= "<link rel='stylesheet' id='bar-css'  href='http://example.org/fixtures/bar/bar.css?ver=1.0.0' type='text/css' media='orientation: portrait' />\n";
+        $expected .= "<style id='bar-inline-css' type='text/css'>\n";
+        $expected .= "div: {border: 10px solid;}\n";
+        $expected .= "</style>\n";
+
+        $this->assertEquals($expected, get_echo('wp_print_styles'));
+    }
+
+
     public function testRemove() {
         $this->assertFalse(wp_style_is('foo', 'registered'));
         $this->assertFalse(wp_style_is('foo', 'enqueued'));
@@ -245,7 +280,7 @@ class StyleTest extends WP_UnitTestCase {
         Style::add('foo', array(
             'path' => '/fixtures/foo.css',
         ));
-        
+
         $this->assertTrue(Style::has('foo'));
         $this->assertFalse(Style::has('bar'));
     }

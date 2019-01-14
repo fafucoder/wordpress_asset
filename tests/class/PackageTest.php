@@ -6,7 +6,7 @@ use Dawn\WordpressAsset\Style;
 use Dawn\WordpressAsset\Package;
 use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
 
-class PackageTest extends WP_UnitTestCase {
+class PackageTest extends \WP_UnitTestCase {
     public $old_wp_scripts;
     public $old_wp_styles;
 
@@ -14,14 +14,18 @@ class PackageTest extends WP_UnitTestCase {
         parent::setUp();
 
         $this->old_wp_scripts = isset($GLOBALS['wp_scripts']) ? $GLOBALS['wp_scripts'] : null;
-        remove_action( 'wp_default_scripts', 'wp_default_scripts' );
+        $this->old_wp_styles = isset($GLOBALS['wp_styles']) ? $GLOBALS['wp_styles'] : null;
+
+        remove_action('wp_default_scripts', 'wp_default_scripts');
+        remove_action('wp_default_styles', '_wp_default_styles');
+        remove_action('wp_print_styles', 'print_emoji_styles');
+        add_action('wp_enqueue_scripts', function() {
+            wp_dequeue_style('wp-block-library');
+        });
+
         $GLOBALS['wp_scripts'] = new \WP_Scripts();
         $GLOBALS['wp_scripts']->default_version = get_bloginfo('version');
         $GLOBALS['wp_scripts']->base_url = 'http://example.org';
-
-        $this->old_wp_styles = isset($GLOBALS['wp_styles']) ? $GLOBALS['wp_styles'] : null;
-        remove_action('wp_default_styles', '_wp_default_styles');
-        remove_action( 'wp_print_styles', 'print_emoji_styles' );
         $GLOBALS['wp_styles'] = new \WP_Styles();
         $GLOBALS['wp_styles']->default_version = get_bloginfo('version');
         $GLOBALS['wp_styles']->base_url = 'http://example.org';
@@ -34,15 +38,19 @@ class PackageTest extends WP_UnitTestCase {
         Style::$registered = array();
         Style::$enqueued = array();
 
-        $GLOBALS['wp_styles'] = $this->old_wp_styles;
-        add_action( 'wp_default_styles', 'wp_default_styles' );
-        add_action( 'wp_print_styles', 'print_emoji_styles' );
-
         Script::$registered = array();
         Script::$enqueued = array();
 
         $GLOBALS['wp_scripts'] = $this->old_wp_scripts;
-        add_action( 'wp_default_scripts', 'wp_default_scripts' );
+        add_action('wp_default_scripts', 'wp_default_scripts');
+
+        $GLOBALS['wp_styles'] = $this->old_wp_styles;
+        add_action('wp_default_styles', 'wp_default_styles');
+        add_action('wp_print_styles', 'print_emoji_styles');
+
+        if ( current_theme_supports( 'wp-block-styles' ) ) {
+            remove_theme_support( 'wp-block-styles' );
+        }
 
         parent::tearDown();
     }
@@ -59,7 +67,7 @@ class PackageTest extends WP_UnitTestCase {
             ),
             'version' => '1.2.5',
             'base' => '/assets/test',
-            'erea' => 'login',
+            'area' => 'login',
         ));
 
         $expected = array(
@@ -67,13 +75,13 @@ class PackageTest extends WP_UnitTestCase {
                 'path' => '/fixtures/foo.css',
                 'version' => '1.2.5',
                 'base' => '/assets/test',
-                'erea' => 'login',
+                'area' => 'login',
             ),
             'bar' => array(
                 'path' => '/fixtures/bar.css',
                 'version' => '1.2.5',
                 'base' => '/assets/test',
-                'erea' => 'login',
+                'area' => 'login',
             ),
         );
 
@@ -92,7 +100,7 @@ class PackageTest extends WP_UnitTestCase {
             ),
             'version' => '1.5.5',
             'base' => '/assets/test',
-            'erea' => 'admin',
+            'area' => 'admin',
         ));
 
         $expected = array(
@@ -100,17 +108,127 @@ class PackageTest extends WP_UnitTestCase {
                 'path' => '/fixtures/foo.js',
                 'version' => '1.5.5',
                 'base' => '/assets/test',
-                'erea' => 'admin',
+                'area' => 'admin',
             ),
             'bar' => array(
                 'path' => '/fixtures/bar.js',
                 'version' => '1.5.5',
                 'base' => '/assets/test',
-                'erea' => 'admin',
+                'area' => 'admin',
             ),
         );
 
         $this->assertEquals($expected, $package->getScripts());
+    }
+
+    public function testConfig() {
+        $package = new Package('foo', array(
+            'scripts' => array(
+                'foo' => array(
+                    'path' => '/fixtures/foo.js',
+                    'version' => '1.2.5',
+                ),
+                'bar' => array(
+                    'path' => '/fixtures/bar.js',
+                    'area' => 'login',
+                ),
+            ),
+            'styles' => array(
+                'foo' => array(
+                    'path' => '/fixtures/foo.css',
+                    'area' => 'customizer',
+                ),
+                'bar' => array(
+                    'path' => '/fixtures/bar.css',
+                    'area' => 'block',
+                ),
+            ),
+            'version' => '1.5.5',
+            'base' => '/assets/test',
+            'area' => 'admin',
+        ));
+
+        $expected_script = array(
+            'foo' => array(
+                'path' => '/fixtures/foo.js',
+                'version' => '1.2.5',
+                'base' => '/assets/test',
+                'area' => 'admin',
+            ),
+            'bar' => array(
+                'path' => '/fixtures/bar.js',
+                'version' => '1.5.5',
+                'base' => '/assets/test',
+                'area' => 'login',
+            ),
+        );
+
+        $expected_style = array(
+            'foo' => array(
+                'path' => '/fixtures/foo.css',
+                'version' => '1.5.5',
+                'base' => '/assets/test',
+                'area' => 'customizer',
+            ),
+            'bar' => array(
+                'path' => '/fixtures/bar.css',
+                'version' => '1.5.5',
+                'base' => '/assets/test',
+                'area' => 'block',
+            ),
+        );
+
+        $this->assertEquals($expected_script, $package->getScripts());
+        $this->assertEquals($expected_style, $package->getStyles());
+    }
+
+    public function testConfigSimple() {
+        $package = new Package('foo', array(
+            'scripts' => array(
+                'foo' => '/fixtures/foo.js',
+                'bar' => '/fixtures/bar.js',
+            ),
+            'styles' => array(
+                'foo' => '/fixtures/foo.css',
+                'bar' => '/fixtures/bar.css',
+            ),
+            'version' => '1.2.5',
+            'base' => '/assets/test',
+            'area' => 'admin',
+        ));
+
+        $expected_script = array(
+            'foo' => array(
+                'path' => '/fixtures/foo.js',
+                'version' => '1.2.5',
+                'base' => '/assets/test',
+                'area' => 'admin',
+            ),
+            'bar' => array(
+                'path' => '/fixtures/bar.js',
+                'version' => '1.2.5',
+                'base' => '/assets/test',
+                'area' => 'admin',
+            ),
+        );
+
+        $expected_style = array(
+            'foo' => array(
+                'path' => '/fixtures/foo.css',
+                'version' => '1.2.5',
+                'base' => '/assets/test',
+                'area' => 'admin',
+            ),
+            'bar' => array(
+                'path' => '/fixtures/bar.css',
+                'version' => '1.2.5',
+                'base' => '/assets/test',
+                'area' => 'admin',
+            ),
+        );
+
+        $this->assertEquals($expected_script, $package->getScripts());
+        $this->assertEquals($expected_style, $package->getStyles());
     }
 
     public function testRegister() {
@@ -167,7 +285,7 @@ class PackageTest extends WP_UnitTestCase {
                     'path' => '/fixtures/map.css',
                 ),
             ),
-            'ver' => '1.2.5',
+            'version' => '1.2.5',
             'base' => '/assets/test',
         ));
 
@@ -187,7 +305,7 @@ class PackageTest extends WP_UnitTestCase {
 
         $choice = Script::get('choice');
         $this->assertTrue($choice->is('enqueued'));
-        
+
         $scripts = "<script type='text/javascript' src='http://example.org/fixtures/choice.js?ver=1.2.5'></script>\n";
         $scripts .= "<script type='text/javascript' src='http://example.org/fixtures/map.js?ver=1.2.5'></script>\n";
 
@@ -236,6 +354,48 @@ class PackageTest extends WP_UnitTestCase {
         $this->assertFalse(Style::has('bar'));
     }
 
+    public function testRemoveAdd() {
+        $package = Package::add('foo', array(
+            'scripts' => array(
+                'foo' => array(
+                    'path' => '/fixtures/foo.js',
+                ),
+                'bar' => array(
+                    'path' => '/fixtures/bar.js',
+                ),
+            ),
+            'styles' => array(
+                'foo' => array(
+                    'path' => '/fixtures/foo.css',
+                ),
+                'bar' => array(
+                    'path' => '/fixtures/bar.css',
+                ),
+            ),
+            'version' => '1.2.5',
+            'base' => '/assets/test',
+        ));
+
+        $this->assertTrue(Script::has('foo'));
+        $this->assertTrue(Script::has('bar'));
+        $this->assertTrue(Style::has('foo'));
+        $this->assertTrue(Style::has('bar'));
+
+        do_action('wp_enqueue_scripts');
+        $foo = Script::get('foo');
+        $this->assertTrue($foo->is('registered'));
+
+        $foo = Style::get('foo');
+        $this->assertTrue($foo->is('registered'));
+
+        Package::remove('foo');
+
+        $this->assertFalse(Script::has('foo'));
+        $this->assertFalse(Script::has('bar'));
+        $this->assertFalse(Style::has('foo'));
+        $this->assertFalse(Style::has('bar'));
+    }
+
     public function testHas() {
         Package::add('foo', array());
         $this->assertTrue(Package::has('foo'));
@@ -257,7 +417,7 @@ class PackageTest extends WP_UnitTestCase {
                     'path' => '/fixtures/foo.css',
                 ),
             ),
-            'ver' => '1.2.5',
+            'version' => '1.2.5',
         ));
 
         $this->assertTrue(Package::has('foo'));

@@ -1,48 +1,49 @@
 <?php
 namespace Dawn\WordpressAsset;
 
-class Package extends Configurable {
+class Package  extends Configurable {
     /**
      * The package name.
-     * 
+     *
      * @var string
      */
-    public $name;
+    protected $name;
 
     /**
      * The scripts.
-     * 
+     *
      * @var array
      */
-    public $scripts = array();
+    protected $scripts = array();
 
     /**
      * The Styles.
-     * 
+     *
      * @var array
      */
-    public $styles = array();
+    protected $styles = array();
 
     /**
      * Registered package.
-     * 
+     *
      * @var array
      */
     public static $registered = array();
 
     /**
      * Enqueued package.
-     * 
+     *
      * @var array
      */
     public static $enqueued = array();
 
     /**
      * Register a new package.
-     * 
-     * @param  string $name   package name
-     * @param  array  $config package config
-     * @return mixed         
+     *
+     * @param string $name   package name
+     * @param array  $config package config
+     *
+     * @return mixed
      */
     public static function add($name, $config = array()) {
         if (is_array($name)) {
@@ -50,7 +51,7 @@ class Package extends Configurable {
                 static::add($n, $conf);
             }
         } else {
-            $package = new Package($name, $config);
+            $package = new self($name, $config);
             $package->register();
 
             return $package;
@@ -59,10 +60,11 @@ class Package extends Configurable {
 
     /**
      * Enqueue a package.
-     * 
-     * @param  string $name   package name
-     * @param  array  $config package config
-     * @return object         return this instance
+     *
+     * @param string $name   package name
+     * @param array  $config package config
+     *
+     * @return object return this instance
      */
     public static function queue($name, $config = array()) {
         if (is_array($name)) {
@@ -70,7 +72,7 @@ class Package extends Configurable {
                 static::queue($n, $conf);
             }
         } else {
-            $package = new Package($name, $config);
+            $package = new self($name, $config);
             $package->enqueue();
 
             return $package;
@@ -80,66 +82,71 @@ class Package extends Configurable {
     /**
      * Remove package.
      *
-     * @param  string $name package name
-     * @return object return this instance       
+     * @param string $name package name
+     *
+     * @return object return this instance
      */
     public static function remove($name) {
-        $package = new Package($name);
+        $package = new self($name);
         $package->deregister();
-
     }
 
     /**
      * Has package.
-     * 
-     * @param  string  $name package name
-     * @return boolean       
+     *
+     * @param string $name package name
+     *
+     * @return bool
      */
     public static function has($name) {
-        return isset(static::$registered[$name]);
+        return isset(static::$registered[$name]) || isset(static::$enqueued[$name]);
     }
 
     /**
      * Get package.
-     * 
-     * @param  string $name package name
+     *
+     * @param string $name package name
+     *
      * @return object
      */
     public static function get($name) {
         if (static::has($name)) {
-            return static::$registered[$name];
+            return isset(static::$registered[$name]) ? static::$registered[$name] : static::$enqueued[$name];
         }
     }
 
     /**
      * Construct.
-     * 
+     *
      * @param string $name   package name
      * @param array  $config package config
      */
     public function __construct($name, $config = array()) {
         $this->name = $name;
         $config = $this->config($config);
-        
-        parent::__construct($config);
+
+        $keys = array_keys(get_object_vars($this));
+        foreach ($keys as $key) {
+            if (isset($config[$key])) {
+                $this->$key = $config[$key];
+            }
+        }
     }
 
     /**
      * Register package.
-     * 
-     * @return  objcet return this instance
+     *
+     * @return $this
      */
     public function register() {
         if (!isset(static::$registered[$this->name])) {
-            foreach ($this->styles as $name => $style) {
+            foreach ($this->getStyles() as $name => $style) {
                 $name = $this->getAssetName($name);
-
                 Style::add($name, $style);
             }
 
-            foreach ($this->scripts as $name => $script) {
+            foreach ($this->getScripts() as $name => $script) {
                 $name = $this->getAssetName($name);
-
                 Script::add($name, $script);
             }
 
@@ -151,37 +158,51 @@ class Package extends Configurable {
 
     /**
      * Enqueue package.
-     * 
+     *
      * @return object return this instance
      */
     public function enqueue() {
-        if (!isset(static::$enqueued[$this->name])) {
-            foreach ($this->styles as $name => $style) {
+        if (isset(static::$enqueued[$this->name])) {
+            return $this;
+        }
+        if (array_key_exists($this->name, static::$registered)) {
+            $asset = static::$registered[$this->name];
+            foreach ($asset->getStyles() as $name => $style) {
                 $name = $this->getAssetName($name);
-
                 Style::queue($name, $style);
             }
-
-            foreach ($this->scripts as $name => $script) {
+            foreach ($asset->getScripts() as $name => $script) {
                 $name = $this->getAssetName($name);
-
                 Script::queue($name, $script);
             }
 
             static::$enqueued[$this->name] = $this;
+
+            return $this;
         }
+
+        foreach ($this->getStyles() as $name => $style) {
+            $name = $this->getAssetName($name);
+            Style::queue($name, $style);
+        }
+        foreach ($this->getScripts() as $name => $script) {
+            $name = $this->getAssetName($name);
+            Script::queue($name, $script);
+        }
+
+        static::$enqueued[$this->name] = $this;
 
         return $this;
     }
 
     /**
      * Deregister package.
-     * 
+     *
      * @return object return this instance
      */
     public function deregister() {
         if (isset(static::$enqueued[$this->name]) || isset(static::$registered[$this->name])) {
-            $package = static::$enqueued[$this->name];
+            $package = isset(static::$enqueued[$this->name]) ? static::$enqueued[$this->name] : static::$registered[$this->name];
             foreach ($package->getStyles() as $name => $style) {
                 Style::remove($name);
             }
@@ -190,8 +211,7 @@ class Package extends Configurable {
                 Script::remove($name);
             }
 
-            unset(static::$enqueued[$this->name]);
-            unset(static::$registered[$this->name]);
+            unset(static::$enqueued[$this->name], static::$registered[$this->name]);
         }
 
         return $this;
@@ -199,8 +219,8 @@ class Package extends Configurable {
 
     /**
      * Get package style assets.
-     * 
-     * @return array 
+     *
+     * @return array
      */
     public function getStyles() {
         return $this->styles;
@@ -208,7 +228,7 @@ class Package extends Configurable {
 
     /**
      * Get package script assets.
-     * 
+     *
      * @return array
      */
     public function getScripts() {
@@ -217,8 +237,8 @@ class Package extends Configurable {
 
     /**
      * Get package name.
-     * 
-     * @return string 
+     *
+     * @return string
      */
     public function getName() {
         return $this->name;
@@ -226,15 +246,16 @@ class Package extends Configurable {
 
     /**
      * Config slice and fill.
-     * 
-     * @param  array  $config 
-     * @return array         sliced and filed array
+     *
+     * @param array $config
+     *
+     * @return array sliced and filed array
      */
     protected function config($config = array()) {
         $diff = array_diff_key($config, array_flip(array('styles', 'scripts')));
 
         // may be this need further optimization.
-        return array_map(function($value) use ($diff) {
+        return array_map(function ($value) use ($diff) {
             if (is_array($value)) {
                 foreach ($value as $key => $v) {
                     if (!is_array($v)) {
@@ -245,20 +266,23 @@ class Package extends Configurable {
                     $value[$key] = array_merge($diff, $v);
                 }
             }
+
             return $value;
         }, $config);
     }
 
     /**
      * Get asset name.
-     * 
-     * @param  string|integer $name 
-     * @return string       
+     *
+     * @param string|int $name
+     *
+     * @return string
      */
     protected function getAssetName($name) {
         if (is_numeric($name)) {
             return $this->name;
         }
+
         return $name;
     }
 }

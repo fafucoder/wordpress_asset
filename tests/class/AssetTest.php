@@ -4,42 +4,53 @@ namespace Dawn\WordpressAsset\Tests;
 use Dawn\WordpressAsset\Asset;
 use Dawn\WordpressAsset\Style;
 use Dawn\WordpressAsset\Script;
-use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
 
-class AssetTest extends WP_UnitTestCase {
+class AssetTest extends \WP_UnitTestCase {
+    public $old_wp_scripts;
+    public $old_wp_styles;
+
     public function setUp() {
         parent::setUp();
 
         $this->old_wp_scripts = isset($GLOBALS['wp_scripts']) ? $GLOBALS['wp_scripts'] : null;
-        remove_action( 'wp_default_scripts', 'wp_default_scripts' );
+        $this->old_wp_styles = isset($GLOBALS['wp_styles']) ? $GLOBALS['wp_styles'] : null;
+
+        remove_action('wp_default_scripts', 'wp_default_scripts');
+        remove_action('wp_default_styles', '_wp_default_styles');
+        remove_action('wp_print_styles', 'print_emoji_styles');
+        add_action('wp_enqueue_scripts', function() {
+            wp_dequeue_style('wp-block-library');
+        });
+
         $GLOBALS['wp_scripts'] = new \WP_Scripts();
         $GLOBALS['wp_scripts']->default_version = get_bloginfo('version');
         $GLOBALS['wp_scripts']->base_url = 'http://example.org';
-
-        $this->old_wp_styles = isset($GLOBALS['wp_styles']) ? $GLOBALS['wp_styles'] : null;
-        remove_action('wp_default_styles', '_wp_default_styles');
-        remove_action( 'wp_print_styles', 'print_emoji_styles' );
         $GLOBALS['wp_styles'] = new \WP_Styles();
         $GLOBALS['wp_styles']->default_version = get_bloginfo('version');
         $GLOBALS['wp_styles']->base_url = 'http://example.org';
     }
 
-    function tearDown() {
+
+    public function tearDown() {
         Asset::$registered = array();
         Asset::$enqueued = array();
 
         Style::$registered = array();
         Style::$enqueued = array();
 
-        $GLOBALS['wp_styles'] = $this->old_wp_styles;
-        add_action( 'wp_default_styles', 'wp_default_styles' );
-        add_action( 'wp_print_styles', 'print_emoji_styles' );
-
         Script::$registered = array();
         Script::$enqueued = array();
 
         $GLOBALS['wp_scripts'] = $this->old_wp_scripts;
-        add_action( 'wp_default_scripts', 'wp_default_scripts' );
+        add_action('wp_default_scripts', 'wp_default_scripts');
+
+        $GLOBALS['wp_styles'] = $this->old_wp_styles;
+        add_action('wp_default_styles', 'wp_default_styles');
+        add_action('wp_print_styles', 'print_emoji_styles');
+
+        if ( current_theme_supports( 'wp-block-styles' ) ) {
+            remove_theme_support( 'wp-block-styles' );
+        }
 
         parent::tearDown();
     }
@@ -48,8 +59,8 @@ class AssetTest extends WP_UnitTestCase {
         $asset = new Asset('foo', array());
 
         $this->assertSame('foo', $asset->name);
-        $this->assertSame('1.0.0', $asset->ver);
-        $this->assertSame(array(), $asset->deps);
+        $this->assertSame('1.0.0', $asset->version);
+        $this->assertSame(array(), $asset->dependency);
         $this->assertSame('front', $asset->area);
         $this->assertSame('', $asset->base);
         $this->assertSame('after', $asset->position);
@@ -59,13 +70,13 @@ class AssetTest extends WP_UnitTestCase {
         $asset = new Asset('bar', array(
             'base' => 'asset/asset',
         ));
-        $this->assertEquals('asset/asset', $asset->base);
+        $this->assertEquals('/asset/asset', $asset->base);
 
         $asset->base('asset');
-        $this->assertEquals('asset', $asset->base);
+        $this->assertEquals('/asset', $asset->base);
 
         $asset->base('asset/assets/');
-        $this->assertEquals('/asset/assets/', $asset->base);
+        $this->assertEquals('/asset/assets', $asset->base);
     }
 
     public function testPath() {
@@ -103,10 +114,10 @@ class AssetTest extends WP_UnitTestCase {
 
     public function testDependences() {
         $asset = new Asset('bar');
-        $this->assertEquals(array(), $asset->deps);
+        $this->assertEquals(array(), $asset->dependency);
 
         $asset->dependences(array('jquery', 'foo'));
-        $this->assertEquals(array('jquery', 'foo'), $asset->deps);
+        $this->assertEquals(array('jquery', 'foo'), $asset->dependency);
     }
 
     public function testInline() {
@@ -120,10 +131,10 @@ class AssetTest extends WP_UnitTestCase {
         $asset->inline('.color {border: 1px solid red; }');
         $this->assertEquals('.color {border: 1px solid red; }', $asset->inline);
 
-        $asset->inline(function() {
-            return ".color: {padding: 10px; margin: 20px}";
+        $asset->inline(function () {
+            return '.color: {padding: 10px; margin: 20px}';
         });
-        $this->assertEquals(".color: {padding: 10px; margin: 20px}", $asset->inline);
+        $this->assertEquals('.color: {padding: 10px; margin: 20px}', $asset->inline);
 
         $asset->inline('console.log("hello world")', 'after');
         $this->assertEquals('console.log("hello world")', $asset->inline);
@@ -168,7 +179,7 @@ class AssetTest extends WP_UnitTestCase {
         $this->assertTrue(wp_script_is('bar', 'enqueued'));
         $this->assertTrue(wp_style_is('bar', 'registered'));
         $this->assertTrue(wp_style_is('bar', 'enqueued'));
-
+   
         $style = "<link rel='stylesheet' id='bar-css'  href='http://example.org/fixters/bar.css?ver=1.0.0' type='text/css' media='screen' />\n";
         $this->assertEquals($style, get_echo('wp_print_styles'));
 
@@ -202,7 +213,6 @@ class AssetTest extends WP_UnitTestCase {
         $this->assertFalse(wp_style_is('foo', 'enqueued'));
         $this->assertFalse(wp_script_is('foo', 'registered'));
         $this->assertFalse(wp_script_is('foo', 'enqueued'));
-
     }
 
     public function testGet() {
@@ -225,7 +235,7 @@ class AssetTest extends WP_UnitTestCase {
 
         do_action('login_enqueue_scripts');
 
-        $expected  = "<script type='text/javascript'>\n/* <![CDATA[ */\nvar variable = {\"foo\":\"bar\"};\n/* ]]> */\n</script>\n";
+        $expected = "<script type='text/javascript'>\n/* <![CDATA[ */\nvar variable = {\"foo\":\"bar\"};\n/* ]]> */\n</script>\n";
         $expected .= "<script type='text/javascript'>\nconsole.log(\"hello world\");\n</script>\n";
         $expected .= "<script type='text/javascript' async=\"async\" src='http://example.org/fixtures/foo/bar.js?ver=1.0.0'></script>\n";
         $this->assertEquals($expected, get_echo('wp_print_footer_scripts'));
@@ -251,21 +261,21 @@ class AssetTest extends WP_UnitTestCase {
         $expected .= "div: {border: 10px solid;}\n";
         $expected .= "</style>\n";
 
-        $this->assertEquals($expected, get_echo('wp_print_styles')); 
+        $this->assertEquals($expected, get_echo('wp_print_styles'));
     }
 
     public function testHas() {
         Style::add('foo', array(
             'path' => '/fixtures/foo.css',
         ));
-        
+
         $this->assertTrue(Style::has('foo'));
         $this->assertFalse(Style::has('bar'));
 
         Script::add('foo', array(
             'path' => '/fixtures/foo.js',
         ));
-        
+
         $this->assertTrue(Script::has('foo'));
         $this->assertFalse(Script::has('bar'));
     }

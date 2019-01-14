@@ -124,24 +124,27 @@ class Asset extends Configurable {
      */
     public static function load($name) {
         $asset = new static($name);
-        $asset->doEnqueue();
+        $asset->doEnqueue($name);
 
         return $asset;
     }
 
     /**
      * Remove asset.
-     * 
-     * @param  string $name asset name
-     * @return void       
+     *
+     * @param string $name asset name
+     *
+     * @return bool
      */
     public static function remove($name) {
-        if (isset(static::$registered[$name])) {
-            $asset = static::$registered[$name];
-            $asset->deregister();
+        if (static::has($name)) {
+            $asset = static::get($name);
+            $asset->dequeue()->deregister();
 
-            return $asset;
+            return true;
         }
+
+        return false;
     }
 
     /**
@@ -171,8 +174,9 @@ class Asset extends Configurable {
 
     /**
      * Construct.
-     * 
+     *
      * @param array $config
+     * @param mixed $name
      */
     public function __construct($name, $config = array()) {
         if (empty($name)) {
@@ -181,19 +185,39 @@ class Asset extends Configurable {
         $this->name = $name;
         parent::__construct($config);
 
+        if ($this->base) {
+            $this->base($this->base);
+        }
+
         static::$registered[$this->name] = $this;
     }
 
     /**
      * Register asset.
-     * 
+     *
+     * @param  string Register name
+     * @param mixed $name
+     *
      * @return object return $this
      */
-    public function doRegister() {
-        foreach (static::$registered as $name => $Asset) {
-            if (array_key_exists($Asset->area, static::$actions)) {                
-                \add_action(static::$actions[$Asset->area], function() use ($Asset) {
-                    $Asset->register();                
+    public function doRegister($name = '') {
+        if (!$name) {
+            foreach (static::$registered as $name => $Asset) {
+                if (array_key_exists($Asset->area, static::$actions)) {
+                    \add_action(static::$actions[$Asset->area], function () use ($Asset) {
+                        $Asset->register();
+                    });
+                }
+            }
+
+            return $this;
+        }
+
+        $Asset = static::$registered[$name];
+        if ($Asset) {
+            if (array_key_exists($Asset->area, static::$actions)) {
+                \add_action(static::$actions[$Asset->area], function () use ($Asset) {
+                    $Asset->register();
                 });
             }
         }
@@ -203,21 +227,42 @@ class Asset extends Configurable {
 
     /**
      * Enqueue assets.
-     * 
+     *
+     * @param string enqueue name
+     * @param mixed $name
+     *
      * @return object return $this
      */
-    public function doEnqueue() {
-        foreach (static::$registered as $name => $Asset) {
-            if (in_array($name, static::$enqueued)) {
-                continue;
-            }
-            if (array_key_exists($Asset->area, static::$actions)) {
-                \add_action(static::$actions[$Asset->area], function() use ($Asset) {
+    public function doEnqueue($name = '') {
+        if (!$name) {
+            foreach (static::$registered as $name => $Asset) {
+                if (in_array($name, static::$enqueued) || !isset(static::$actions[$Asset->area])) {
+                    continue;
+                }
+
+                \add_action(static::$actions[$Asset->area], function () use ($Asset) {
                     $Asset->enqueue();
                 });
+                static::$enqueued[$name] = $Asset;
             }
 
+            return $this;
+        }
+
+        $Asset = static::$registered[$name];
+        if ($Asset) {
+            if (!array_key_exists($Asset->area, static::$actions)) {
+                throw new \InvalidArgumentException(__(sprintf('area not found for area: %s', $Asset->area), 'creation-framework'));
+            }
+            \add_action(static::$actions[$Asset->area], function () use ($Asset) {
+                $Asset->enqueue();
+            });
+
             static::$enqueued[$name] = $Asset;
+        } else {
+           \add_action(static::$actions[$this->area], function() {
+                $this->enqueue();
+            });
         }
 
         return $this;
@@ -271,13 +316,21 @@ class Asset extends Configurable {
 
     /**
      * Specify where to load the asset: 'admin', 'login' or 'customizer'.
-     * 
-     * @param  string $area specify erea
-     * @return object   return $this object
+     *
+     * @param string $area specify erea
+     *
+     * @return object return $this object
      */
     public function area($area = 'front') {
         if (array_key_exists($area, static::$actions)) {
             $this->area = $area;
+
+            //resolve dependency
+            foreach ($this->dependency as $dep) {
+                if (isset(static::$registered[$dep])) {
+                    static::$registered[$dep]->area($area);
+                }
+            }
 
             static::$registered[$this->name] = $this;
         }
@@ -325,7 +378,7 @@ class Asset extends Configurable {
      * 
      * @return string 
      */
-    public  function getPath() {
+    public function getPath() {
         if (strpos($this->path, 'http://') !== false || strpos($this->path, 'https://') !== false || substr($this->path, 0, 2) === '//') {
             return $this->path;
         }
@@ -339,18 +392,64 @@ class Asset extends Configurable {
     }
 
     /**
-     * resolve style dependency not found.
-     * 
-     * @param  array  $dependecy 
-     * @return array            
+     * Check asset status.
+     *
+     * @param string $status asset status
+     * @param string $name
      */
-    protected function checkDepency($dependecy = array()) {
-        foreach ($dependecy as $key => $dep) {
+    public function is($status = 'enqueued', $name = '') {
+    }
+
+    /**
+     * resolve style dependency not found.
+     *
+     * @param array $dependency
+     *
+     * @return array
+     */
+    protected function checkDepency($dependency = array()) {
+        foreach ($dependency as $key => $dep) {
             if (!$this->is('registered', $dep)) {
-                unset($dependecy[$key]);
+                unset($dependency[$key]);
             }
         }
 
-        return $dependecy;
+        return $dependency;
+    }
+
+    /**
+     * Enqueue dependency.
+     * 
+     * @return array 
+     */
+    protected function enqueueDependency() {
+        $dependency = [];
+        foreach ($this->dependency as $dep) {
+            if (isset(static::$registered[$dep])) {
+                static::$registered[$dep]->enqueue();
+
+                $dependency[] = $dep;
+            }
+        }
+
+        return $dependency;
+    }
+
+    /**
+     * Register dependency.
+     * 
+     * @return array 
+     */
+    protected function registerDependency() {
+        $dependency = [];
+        foreach ($this->dependency as $dep) {
+            if (isset(static::$registered[$dep])) {
+                static::$registered[$dep]->register();
+
+                $dependency[] = $dep;
+            }
+        }
+
+        return $dependency;
     }
 }

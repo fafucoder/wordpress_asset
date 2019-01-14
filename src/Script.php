@@ -4,51 +4,52 @@ namespace Dawn\WordpressAsset;
 class Script extends Asset {
     /**
      * The script if defined in the footer.
-     * 
-     * @var boolean
+     *
+     * @var bool
      */
     public $footer = false;
 
     /**
      * The localize data.
-     * 
+     *
      * @var string
      */
     public $localize = array();
 
     /**
      * Async script.
-     * 
-     * @var boolean
+     *
+     * @var bool
      */
     public $async;
 
     /**
      * Defer script.
-     * 
-     * @var boolean
+     *
+     * @var bool
      */
     public $defer;
 
     /**
      * The list of registered assets.
-     * 
+     *
      * @var array
      */
     public static $registered = array();
 
     /**
      * The list of enqueued assets.
-     * 
+     *
      * @var array
      */
     public static $enqueued = array();
 
     /**
      * The position to load script and have footer or head placed.
-     * 
-     * @param  string $position load script position
-     * @return mixed 
+     *
+     * @param string $position load script position
+     *
+     * @return mixed
      */
     public function footer() {
         $this->footer = true;
@@ -58,10 +59,11 @@ class Script extends Asset {
 
     /**
      * Localize data for the asset.
-     * 
-     * @param  string $obj_name 
-     * @param  mixed  $data   any data to attach to the JS variable: string, boolean, object, array, ...
-     * 
+     *
+     * @param string $obj_name
+     * @param mixed  $data       any data to attach to the JS variable: string, boolean, object, array, ...
+     * @param mixed  $objectName
+     *
      * @return object return $this
      */
     public function localize($objectName, $data) {
@@ -75,8 +77,8 @@ class Script extends Asset {
 
     /**
      * async asset.
-     * 
-     * @return object  return $this
+     *
+     * @return object return $this
      */
     public function async() {
         $this->async = true;
@@ -86,8 +88,8 @@ class Script extends Asset {
 
     /**
      * Defer script.
-     * 
-     * @return object  return $this
+     *
+     * @return object return $this
      */
     public function defer() {
         $this->defer = true;
@@ -97,12 +99,13 @@ class Script extends Asset {
 
     /**
      * Register script.
-     * 
-     * @return object  return $this
+     *
+     * @return object return $this
      */
     public function register() {
         if (!$this->is('registered')) {
-            $dependency = $this->checkDepency($this->dependency);
+            // $dependency = $this->checkDepency($this->dependency);
+            $dependency = $this->registerDependency();
             wp_register_script($this->name, $this->getPath(), $dependency, $this->version, $this->footer);
         }
 
@@ -111,7 +114,7 @@ class Script extends Asset {
 
     /**
      * Enqueue script.
-     * 
+     *
      * @return object return $this
      */
     public function enqueue() {
@@ -119,7 +122,9 @@ class Script extends Asset {
             if ($this->is('registered')) {
                 wp_enqueue_script($this->name);
             } else {
-                $dependency = $this->checkDepency($this->dependency);
+                // $dependency = $this->checkDepency($this->dependency);
+                $dependency = $this->enqueueDependency();
+
                 wp_enqueue_script($this->name, $this->getPath(), $dependency, $this->version, $this->footer);
             }
         }
@@ -133,10 +138,11 @@ class Script extends Asset {
 
     /**
      * Load tag.
-     * 
-     * @param  string $tag    
-     * @param  string $handle 
-     * @return string         
+     *
+     * @param string $tag
+     * @param string $handle
+     *
+     * @return string
      */
     public function _loadTag($tag, $handle) {
         if ($this->name === $handle) {
@@ -154,8 +160,8 @@ class Script extends Asset {
 
     /**
      * Unregister script.
-     * 
-     * @return object  return $this
+     *
+     * @return object return $this
      */
     public function deregister() {
         if ($this->is('registered')) {
@@ -168,7 +174,7 @@ class Script extends Asset {
 
     /**
      * Dequeue script.
-     * 
+     *
      * @return object return $this
      */
     public function dequeue() {
@@ -182,7 +188,7 @@ class Script extends Asset {
 
     /**
      * Localize script.
-     * 
+     *
      * @return object return $this
      */
     public function localizeAsset() {
@@ -197,7 +203,7 @@ class Script extends Asset {
 
     /**
      * Inline script.
-     * 
+     *
      * @return object return $this
      */
     public function inlineAsset() {
@@ -212,9 +218,10 @@ class Script extends Asset {
      * Check asset status.
      *
      * @param  string asset name
-     * @param  string  $status asset status
-     * 
-     * @return boolean         
+     * @param string $status asset status
+     * @param mixed  $name
+     *
+     * @return bool
      */
     public function is($status = 'enqueued', $name = '') {
         if (empty($name)) {
@@ -225,6 +232,6 @@ class Script extends Asset {
             return false;
         }
 
-        return wp_script_is($this->name, $status);
+        return wp_script_is($name, $status);
     }
 }

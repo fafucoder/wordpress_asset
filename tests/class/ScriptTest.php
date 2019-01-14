@@ -5,25 +5,30 @@ use Dawn\WordpressAsset\Asset;
 use Dawn\WordpressAsset\Style;
 use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
 
-class ScriptTest extends WP_UnitTestCase {
+class ScriptTest extends \WP_UnitTestCase {
     public $old_wp_scripts;
+
+    public static function wpSetUpBeforeClass($factory) {
+        $user = $factory->user->create(array('role' => 'administrator'));
+        wp_set_current_user($user);
+    }
 
     public function setUp() {
         parent::setUp();
 
         $this->old_wp_scripts = isset($GLOBALS['wp_scripts']) ? $GLOBALS['wp_scripts'] : null;
-        remove_action( 'wp_default_scripts', 'wp_default_scripts' );
+        remove_action('wp_default_scripts', 'wp_default_scripts');
         $GLOBALS['wp_scripts'] = new \WP_Scripts();
         $GLOBALS['wp_scripts']->default_version = get_bloginfo('version');
         $GLOBALS['wp_scripts']->base_url = 'http://example.org';
     }
 
-    function tearDown() {
+    public function tearDown() {
         Script::$registered = array();
         Script::$enqueued = array();
 
         $GLOBALS['wp_scripts'] = $this->old_wp_scripts;
-        add_action( 'wp_default_scripts', 'wp_default_scripts' );
+        add_action('wp_default_scripts', 'wp_default_scripts');
 
         parent::tearDown();
     }
@@ -32,8 +37,8 @@ class ScriptTest extends WP_UnitTestCase {
         $script = new Script('foo', array());
 
         $this->assertSame('foo', $script->name);
-        $this->assertSame('1.0.0', $script->ver);
-        $this->assertSame(array(), $script->deps);
+        $this->assertSame('1.0.0', $script->version);
+        $this->assertSame(array(), $script->dependency);
         $this->assertSame('front', $script->area);
         $this->assertSame('after', $script->position);
         $this->assertSame(false, $script->footer);
@@ -55,7 +60,7 @@ class ScriptTest extends WP_UnitTestCase {
         $script->localize('variable', array('data' => 'value'));
         $this->assertEquals(array('variable' => array('data' => 'value')), $script->localize);
 
-        $script->localize('variable', function(){
+        $script->localize('variable', function () {
             return array('data' => 'data');
         });
         $this->assertEquals(array('variable' => array('data' => 'data')), $script->localize);
@@ -79,7 +84,7 @@ class ScriptTest extends WP_UnitTestCase {
 
     public function testRegister() {
         $script = new Script('foo', array(
-            'path' => '/fixtures/foo.js'
+            'path' => '/fixtures/foo.js',
         ));
 
         $this->assertFalse(wp_script_is('foo', 'registered'));
@@ -120,7 +125,7 @@ class ScriptTest extends WP_UnitTestCase {
 
         $expected = "<script type='text/javascript'>\n/* <![CDATA[ */\nvar variable = {\"foo\":\"bar\"};\n/* ]]> */\n</script>\n";
         $expected .= "<script type='text/javascript' src='http://example.org/fixtures/bar.js?ver=1.0.0'></script>\n";
-        
+
         $this->assertEquals($expected, get_echo('wp_print_scripts'));
     }
 
@@ -147,7 +152,7 @@ class ScriptTest extends WP_UnitTestCase {
 
         $expected = "<script type='text/javascript'>\nconsole.log(\"hello world\");\n</script>\n";
         $expected .= "<script type='text/javascript' src='http://example.org/fixtures/bar.js?ver=1.0.0'></script>\n";
-        
+
         $this->assertEquals($expected, get_echo('wp_print_scripts'));
     }
 
@@ -202,7 +207,7 @@ class ScriptTest extends WP_UnitTestCase {
 
     public function testDoEnqueue() {
         $script = new Script('foo', array(
-            'path' => '/fixture/foo.js'
+            'path' => '/fixture/foo.js',
         ));
 
         $this->assertFalse($script->is('enqueued'));
@@ -254,7 +259,6 @@ class ScriptTest extends WP_UnitTestCase {
             ->inline('console.log("hello world");')
             ->in('before')
             ->localize('variable', array('foo' => 'bar'))
-            ->footer()
             ->path('/fixtures/foo/bar.js')
             ->area('login')
             ->async()
@@ -262,10 +266,40 @@ class ScriptTest extends WP_UnitTestCase {
 
         do_action('login_enqueue_scripts');
 
-        $expected  = "<script type='text/javascript'>\n/* <![CDATA[ */\nvar variable = {\"foo\":\"bar\"};\n/* ]]> */\n</script>\n";
+        $expected = "<script type='text/javascript'>\n/* <![CDATA[ */\nvar variable = {\"foo\":\"bar\"};\n/* ]]> */\n</script>\n";
         $expected .= "<script type='text/javascript'>\nconsole.log(\"hello world\");\n</script>\n";
         $expected .= "<script type='text/javascript' async=\"async\" src='http://example.org/fixtures/foo/bar.js?ver=1.0.0'></script>\n";
-        $this->assertEquals($expected, get_echo('wp_print_footer_scripts'));
+        $this->assertEquals($expected, get_echo('wp_print_scripts'));
+    }
+
+    public function testGetAsDependency() {
+        Script::queue('bar', array(
+            'path' => '/fixtures/bar.js',
+        ));
+        Script::add('foo', array(
+            'path' => '/fixtures/foo.js',
+            'dependency' => array('bar'),
+        ));
+
+        $script = Script::get('foo');
+        $this->assertInstanceOf(Asset::class, $script);
+
+        $script
+            ->inline('console.log("hello world");')
+            ->in('before')
+            ->localize('variable', array('foo' => 'bar'))
+            ->path('/fixtures/foo/bar.js')
+            ->area('login')
+            ->async()
+            ->doEnqueue();
+
+        do_action('login_enqueue_scripts');
+
+        $expected = "<script type='text/javascript' src='http://example.org/fixtures/bar.js?ver=1.0.0'></script>\n";
+        $expected .= "<script type='text/javascript'>\n/* <![CDATA[ */\nvar variable = {\"foo\":\"bar\"};\n/* ]]> */\n</script>\n";
+        $expected .= "<script type='text/javascript'>\nconsole.log(\"hello world\");\n</script>\n";
+        $expected .= "<script type='text/javascript' async=\"async\" src='http://example.org/fixtures/foo/bar.js?ver=1.0.0'></script>\n";
+        $this->assertEquals($expected, get_echo('wp_print_scripts'));
     }
 
     public function testRemove() {
@@ -289,7 +323,7 @@ class ScriptTest extends WP_UnitTestCase {
         Script::add('foo', array(
             'path' => '/fixtures/foo.js',
         ));
-        
+
         $this->assertTrue(Script::has('foo'));
         $this->assertFalse(Script::has('bar'));
     }
