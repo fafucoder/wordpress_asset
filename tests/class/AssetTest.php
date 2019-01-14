@@ -76,7 +76,7 @@ class AssetTest extends \WP_UnitTestCase {
         $this->assertEquals('/asset', $asset->base);
 
         $asset->base('asset/assets/');
-        $this->assertEquals('/asset/assets', $asset->base);
+        $this->assertEquals('/asset/assets/', $asset->base);
     }
 
     public function testPath() {

@@ -2,8 +2,7 @@
 namespace Dawn\WordpressAsset\Tests;
 
 use Dawn\WordpressAsset\Asset;
-use Dawn\WordpressAsset\Style;
-use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
+use Dawn\WordpressAsset\Script;
 
 class ScriptTest extends \WP_UnitTestCase {
     public $old_wp_scripts;

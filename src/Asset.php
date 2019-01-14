@@ -25,17 +25,17 @@ class Asset extends Configurable {
 
     /**
      * Asset Dependency.
-     * 
+     *
      * @var array
      */
-    public $deps = array();
+    public $dependency = array();
 
     /**
      * Asset version.
-     * 
+     *
      * @var string
      */
-    public $ver = '1.0.0';
+    public $version = '1.0.0';
 
     /**
      * Inline code in the position for the inline asset, This is affect script and not influence css class.
@@ -295,9 +295,9 @@ class Asset extends Configurable {
      */
     public function dependences($deps = array()) {
         if (is_string($deps)) {
-            $deps = explode(",", $deps);
+            $dependency = explode(',', $deps);
         }
-        $this->deps = $deps;
+        $this->dependency = $deps;
 
         return $this;
     }
@@ -346,7 +346,11 @@ class Asset extends Configurable {
      */
     public function base($base = null) {
         if ($base) {
-            $this->base = $base;
+            if ((false === filter_var($base, FILTER_VALIDATE_URL)) && !preg_match('/^\:(?:\\\\|\/\/)/', $base)) {
+                $this->base = '/' . $base;
+            } else {
+                $this->base = $base;
+            }
         }
 
         return $this;
@@ -384,11 +388,15 @@ class Asset extends Configurable {
         }
 
         //is absolute path.
-        if (stpos($this->path, '/') === 0) {
+        if (strpos($this->path, '/') === 0) {
             return $this->path;
         }
 
-        return rtrim($this->getBase(), '/') . DIRECTORY_SEPARATOR . $this->path;
+        if ($base = $this->getBase()) {
+            return rtrim($base, '/') . DIRECTORY_SEPARATOR . $this->path;
+        }
+        
+        return $this->path;
     }
 
     /**

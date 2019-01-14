@@ -3,7 +3,6 @@ namespace Dawn\WordpressAsset\Tests;
 
 use Dawn\WordpressAsset\Asset;
 use Dawn\WordpressAsset\Style;
-use MonkeryTestCase\BrainMonkeyWpTestCase as WP_UnitTestCase;
 
 class StyleTest extends \WP_UnitTestCase {
     public $old_wp_styles;
